@@ -6,29 +6,43 @@
         <input type="file" v-on:change="upload" accept="image/*" />
       </label>
     </div>
-    <p>
-      <label>
-        色の数
-        <input type="number" v-model="colors" />
-      </label>
-    </p>
-    <p>
-      <label>
-        変更後の幅
-        <input type="number" v-model="width_after" />
-      </label>
-    </p>
 
-    <p>{{ colors }}</p>
-    <p>{{ width_after }}</p>
-    <p>オリジナル画像の幅：{{ width_before }}</p>
-    <p>オリジナル画像の高さ：{{ height_before }}</p>
-    <pre>
-      {{ $data }}
-    </pre>
+    <p>オリジナル画像の幅：{{ widthBefore }}</p>
+    <p>オリジナル画像の高さ：{{ heightBefore }}</p>
     <div>
       <h2>変換前プレビュー</h2>
-      <canvas id="preview_before"></canvas>
+      <canvas id="preview-before"></canvas>
+    </div>
+    <div>
+      <h2>変換</h2>
+      <p>
+        <label>
+          色の数
+          <input type="number" v-model="colors" />
+        </label>
+      </p>
+      <p>
+        <label>
+          変更後の幅
+          <input type="number" step="10" v-model="widthAfter" />
+        </label>
+      </p>
+      <p>
+        <label>
+          ピクセルの大きさ
+          <input type="number" v-model="pixelSize" />
+        </label>
+      </p>
+      <p>
+        <label>
+          グリッド線をつける
+          <input type="checkbox" v-model="grid" />
+        </label>
+      </p>
+      <p>
+        <button v-on:click="toPixel">Pixelize!!!</button>
+      </p>
+      <canvas id="preview-after"></canvas>
     </div>
   </div>
 </template>
@@ -38,11 +52,14 @@ export default {
   name: "Pixelize",
   data() {
     return {
-      width_before: 0,
-      height_before: 0,
-      width_after: 300,
-      height_after: 300,
-      colors: 0
+      widthBefore: null,
+      heightBefore: null,
+      widthAfter: 100,
+      heightAfter: null,
+      colors: 3,
+      pixelSize: 10,
+      grid: true,
+      img: null
     };
   },
   methods: {
@@ -57,49 +74,182 @@ export default {
         img = new Image();
         // 画像が読み込まれたときの処理（canvasに描画）
         img.onload = function() {
-          let canvas = document.getElementById("preview_before");
+          let canvas = document.getElementById("preview-before");
           if (canvas.getContext) {
             // canvas 2d contextが使える前提
             let context = canvas.getContext("2d");
-            this.width_before = img.width;
-            this.height_before = img.height;
-            let scale = this.width_after / this.width_before;
-            canvas.width = this.width_before * scale;
-            canvas.height = this.height_before * scale;
-            context.scale(scale, scale);
+            this.widthBefore = img.width;
+            this.heightBefore = img.height;
+            canvas.width = this.widthBefore;
+            canvas.height = this.heightBefore;
             context.drawImage(img, 0, 0);
-            // ここから変換処理
-            let srcData = context.getImageData(
-              0,
-              0,
-              canvas.width,
-              canvas.height
-            );
-            let dstData = context.createImageData(canvas.width, canvas.height);
-            let src = srcData.data;
-            let dst = dstData.data;
-            grayFilter(src, dst, canvas.width, canvas.height);
-            context.putImageData(dstData, canvas.width / 2, 0);
+            this.img = img;
           }
         }.bind(this);
         img.src = reader.result;
       }.bind(this);
+    },
+    toPixel: function() {
+      let canvas = document.getElementById("preview-after");
+      if (canvas.getContext) {
+        let context = canvas.getContext("2d");
+        let scale = this.widthAfter / this.widthBefore;
+        this.heightAfter = this.heightBefore * scale;
+        canvas.width = this.widthBefore * scale;
+        canvas.height = this.heightBefore * scale;
+        context.scale(scale, scale);
+        context.drawImage(this.img, 0, 0);
+        let srcData = context.getImageData(0, 0, canvas.width, canvas.height);
+        let dstData = context.createImageData(canvas.width, canvas.height);
+        let src = srcData.data;
+        let dst = dstData.data;
+        kMeansFilter(src, dst, canvas.width, canvas.height, this.colors);
+        canvas.width *= this.pixelSize;
+        canvas.height *= this.pixelSize;
+        let outputImageData = visualizePixel(
+          dstData,
+          this.pixelSize,
+          this.grid
+        );
+        context.putImageData(outputImageData, 0, 0);
+      }
     }
   }
 };
 
-//グレースケール変換関数（仮）
-let grayFilter = function(src, dst, width, height) {
+// クラスタリング
+const kMeansFilter = (src, dst, width, height, colors) => {
+  const vmax = 255; // 配列要素の最大値
+  const loopMax = 100; // ループ処理の最大回数
+
+  // 初期化
+  let centroids = Array(colors); // 各クラスタ中心を保持
+  for (var c = 0; c < colors; c++) {
+    var centroid = Array(3);
+    for (var k = 0; k < 3; k++) {
+      centroid[k] = Math.floor(Math.random() * vmax);
+    }
+    centroids[c] = centroid;
+  }
+
+  let clsts = Array(width * height); // 各画素の所属クラスタラベル（0～colors-1）を保持
+  let clstsSize = Array(colors); // 各クラスタのサイズを保持（重心計算用）
+  let count = 0;
+
+  // メイン処理
+  let clstsPrev = JSON.parse(JSON.stringify(clsts));
+  let exitFlg = false;
+  while (true) {
+    for (var i = 0; i < height; i++) {
+      for (var j = 0; j < width; j++) {
+        var vec = src.slice((j + i * width) * 4, (j + i * width) * 4 + 3);
+        var minDist = calcDistance(vec, centroids[0]);
+        var minClst = 0;
+        for (var c = 1; c < colors; c++) {
+          var nextDist = calcDistance(vec, centroids[c]);
+          if (nextDist < minDist) {
+            minDist = nextDist;
+            minClst = c;
+          }
+        }
+        clsts[j + i * width] = minClst;
+      }
+    }
+    // update centroids
+    clstsSize.fill(0);
+    for (var c = 0; c < colors; c++) {
+      centroids[c].fill(0);
+    }
+    for (var i = 0; i < height; i++) {
+      for (var j = 0; j < width; j++) {
+        var clst = clsts[j + i * width];
+        for (var k = 0; k < 3; k++) {
+          centroids[clst][k] += src[(j + i * width) * 4 + k];
+        }
+        clstsSize[clst] = clstsSize[clst] + 1;
+      }
+    }
+    for (var c = 0; c < colors; c++) {
+      for (var k = 0; k < 3; k++) {
+        centroids[c][k] =
+          clstsSize[c] > 0 ? Math.floor(centroids[c][k] / clstsSize[c]) : 0;
+      }
+    }
+
+    exitFlg =
+      JSON.stringify(clsts) === JSON.stringify(clstsPrev) || count > loopMax;
+    if (exitFlg) {
+      break;
+    }
+    clstsPrev = JSON.parse(JSON.stringify(clsts));
+    count++;
+  }
+  console.log(count);
+
+  // クラスタリング結果を反映
   for (var i = 0; i < height; i++) {
     for (var j = 0; j < width; j++) {
-      var idx = (j + i * width) * 4;
-      var gray = (src[idx] + src[idx + 1] + src[idx + 2]) / 3;
-      dst[idx] = gray;
-      dst[idx + 1] = gray;
-      dst[idx + 2] = gray;
-      dst[idx + 3] = src[idx + 3];
+      var clst = clsts[j + i * width];
+      for (var k = 0; k < 3; k++) {
+        dst[(j + i * width) * 4 + k] = centroids[clst][k];
+        // 透明度は維持
+        dst[(j + i * width) * 4 + 3] = src[(j + i * width) * 4 + 3];
+      }
     }
   }
+};
+
+// ベクトル間距離
+const calcDistance = (vec1, vec2) => {
+  let dist = 0;
+  for (var i = 0; i < vec1.length; i++) {
+    dist += Math.pow(Math.abs(vec2[i] - vec1[i]), 2);
+  }
+  dist = Math.sqrt(dist);
+  return dist;
+};
+
+// ドット絵を見やすくする（拡大、グリッド線）
+const visualizePixel = (inputImageData, pixelSize, grid) => {
+  const vmax = 255; // 配列要素の最大値
+  const gridStep = 10; // グリッド線をgridStepごとに太くする
+
+  const newWidth = inputImageData.width * pixelSize;
+  const newHeight = inputImageData.height * pixelSize;
+  const outputImageData = new ImageData(
+    inputImageData.width * pixelSize,
+    inputImageData.height * pixelSize
+  );
+  // 拡大
+  for (var i = 0; i < newHeight; i++) {
+    for (var j = 0; j < newWidth; j++) {
+      var iOld = Math.floor(i / pixelSize);
+      var jOld = Math.floor(j / pixelSize);
+      for (var k = 0; k < 4; k++) {
+        outputImageData.data[(j + i * newWidth) * 4 + k] =
+          inputImageData.data[(jOld + iOld * inputImageData.width) * 4 + k];
+      }
+    }
+  }
+  // グリッド線
+  if (grid) {
+    for (var i = 0; i < newHeight; i++) {
+      for (var j = 0; j < newWidth; j++) {
+        if (
+          i % pixelSize == 0 ||
+          j % pixelSize == 0 ||
+          (i + 1) % (pixelSize * gridStep) == 0 ||
+          (j + 1) % (pixelSize * gridStep) == 0
+        ) {
+          for (var k = 0; k < 3; k++) {
+            outputImageData.data[(j + i * newWidth) * 4 + k] = vmax;
+          }
+          outputImageData.data[(j + i * newWidth) * 4 + k] = vmax;
+        }
+      }
+    }
+  }
+  return outputImageData;
 };
 </script>
 
