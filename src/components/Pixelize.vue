@@ -123,17 +123,23 @@ const kMeansFilter = (src, dst, width, height, colors) => {
   const loopMax = 100; // ループ処理の最大回数
 
   // 初期化
+  colors = parseInt(colors);
   let centroids = Array(colors); // 各クラスタ中心を保持
   for (var c = 0; c < colors; c++) {
-    var centroid = Array(3);
-    for (var k = 0; k < 3; k++) {
-      centroid[k] = Math.floor(Math.random() * vmax);
-    }
-    centroids[c] = centroid;
+    var rand_i = Math.floor(Math.random() * height);
+    var rand_j = Math.floor(Math.random() * width);
+    centroids[c] = src.slice(
+      (rand_j + rand_i * width) * 4,
+      (rand_j + rand_i * width) * 4 + 3
+    );
   }
 
   let clsts = Array(width * height); // 各画素の所属クラスタラベル（0～colors-1）を保持
-  let clstsSize = Array(colors); // 各クラスタのサイズを保持（重心計算用）
+  let clstsSum = Array(colors); // 各クラスタの重心計算用
+  for (var c = 0; c < colors; c++) {
+    clstsSum[c] = Array(3);
+  }
+  let clstsSize = Array(colors); // 各クラスタの重心計算用
   let count = 0;
 
   // メイン処理
@@ -158,13 +164,13 @@ const kMeansFilter = (src, dst, width, height, colors) => {
     // update centroids
     clstsSize.fill(0);
     for (var c = 0; c < colors; c++) {
-      centroids[c].fill(0);
+      clstsSum[c].fill(0);
     }
     for (var i = 0; i < height; i++) {
       for (var j = 0; j < width; j++) {
         var clst = clsts[j + i * width];
         for (var k = 0; k < 3; k++) {
-          centroids[clst][k] += src[(j + i * width) * 4 + k];
+          clstsSum[clst][k] += src[(j + i * width) * 4 + k];
         }
         clstsSize[clst] = clstsSize[clst] + 1;
       }
@@ -172,7 +178,7 @@ const kMeansFilter = (src, dst, width, height, colors) => {
     for (var c = 0; c < colors; c++) {
       for (var k = 0; k < 3; k++) {
         centroids[c][k] =
-          clstsSize[c] > 0 ? Math.floor(centroids[c][k] / clstsSize[c]) : 0;
+          clstsSize[c] > 0 ? Math.floor(clstsSum[c][k] / clstsSize[c]) : 0;
       }
     }
 
