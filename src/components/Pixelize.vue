@@ -1,6 +1,6 @@
 <template>
   <div class="pixelize">
-    <h1>Pixelize.vue</h1>
+    <h1>Pixelize!!!</h1>
     <div>
       <label>
         <input type="file" v-on:change="upload" accept="image/*" />
@@ -25,7 +25,13 @@
         <p>
           <label>
             変更後の幅（1～1000）
-            <input type="number" step="1" min="1" max="1000" v-model="widthAfter" />
+            <input
+              type="number"
+              step="1"
+              min="1"
+              max="1000"
+              v-model="widthAfter"
+            />
           </label>
         </p>
         <p>
@@ -61,7 +67,7 @@ export default {
       colors: 3,
       pixelSize: 10,
       grid: true,
-      img: null
+      img: null,
     };
   },
   methods: {
@@ -118,8 +124,8 @@ export default {
         );
         context.putImageData(outputImageData, 0, 0);
       }
-    }
-  }
+    },
+  },
 };
 
 // クラスタリング
@@ -265,18 +271,7 @@ const visualizePixel = (inputImageData, pixelSize, grid) => {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-h3 {
-  margin: 40px 0 0;
-}
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-a {
+h1 {
   color: #42b983;
 }
 </style>
