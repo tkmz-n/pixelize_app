@@ -15,33 +15,35 @@
     </div>
     <div>
       <h2>変換</h2>
-      <p>
-        <label>
-          色の数
-          <input type="number" v-model="colors" />
-        </label>
-      </p>
-      <p>
-        <label>
-          変更後の幅
-          <input type="number" step="10" v-model="widthAfter" />
-        </label>
-      </p>
-      <p>
-        <label>
-          ピクセルの大きさ
-          <input type="number" v-model="pixelSize" />
-        </label>
-      </p>
-      <p>
-        <label>
-          グリッド線をつける
-          <input type="checkbox" v-model="grid" />
-        </label>
-      </p>
-      <p>
-        <button v-on:click="toPixel">Pixelize!!!</button>
-      </p>
+      <form v-on:submit.prevent="toPixel">
+        <p>
+          <label>
+            色の数（1～100）
+            <input type="number" min="1" max="100" v-model="colors" />
+          </label>
+        </p>
+        <p>
+          <label>
+            変更後の幅（1～1000）
+            <input type="number" step="1" min="1" max="1000" v-model="widthAfter" />
+          </label>
+        </p>
+        <p>
+          <label>
+            ピクセルの大きさ（3～30）
+            <input type="number" min="3" max="30" v-model="pixelSize" />
+          </label>
+        </p>
+        <p>
+          <label>
+            グリッド線をつける
+            <input type="checkbox" v-model="grid" />
+          </label>
+        </p>
+        <p>
+          <button type="submit">Pixelize!!!</button>
+        </p>
+      </form>
       <canvas id="preview-after"></canvas>
     </div>
   </div>
@@ -66,6 +68,9 @@ export default {
     upload: function(event) {
       let img = null;
       let file = event.target.files;
+      if (file.length == 0) {
+        return;
+      }
       let reader = new FileReader();
       reader.readAsDataURL(file[0]);
 
@@ -91,7 +96,7 @@ export default {
     },
     toPixel: function() {
       let canvas = document.getElementById("preview-after");
-      if (canvas.getContext) {
+      if (canvas.getContext && this.img != null) {
         let context = canvas.getContext("2d");
         let scale = this.widthAfter / this.widthBefore;
         this.heightAfter = this.heightBefore * scale;
