@@ -195,7 +195,6 @@ const kMeansFilter = (src, dst, width, height, colors) => {
     clstsPrev = JSON.parse(JSON.stringify(clsts));
     count++;
   }
-  console.log(count);
 
   // クラスタリング結果を反映
   for (var i = 0; i < height; i++) {
