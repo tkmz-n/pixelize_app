@@ -1,6 +1,10 @@
 <template>
   <div class="pixelize">
     <h1>Pixelize!!!</h1>
+    <p>
+      画像をドット絵に変換します。
+      <br />好きな画像ファイルを選択してから「Pixelize!!!」をクリックしてください。
+    </p>
     <div>
       <label>
         <input type="file" v-on:change="upload" accept="image/*" />
@@ -25,13 +29,7 @@
         <p>
           <label>
             変更後の幅（1～1000）
-            <input
-              type="number"
-              step="1"
-              min="1"
-              max="1000"
-              v-model="widthAfter"
-            />
+            <input type="number" step="1" min="1" max="1000" v-model="widthAfter" />
           </label>
         </p>
         <p>
@@ -71,7 +69,7 @@ export default {
     };
   },
   methods: {
-    upload: function(event) {
+    upload: function (event) {
       let img = null;
       let file = event.target.files;
       if (file.length == 0) {
@@ -81,10 +79,10 @@ export default {
       reader.readAsDataURL(file[0]);
 
       // ファイルを読み込んだときの処理
-      reader.onload = function() {
+      reader.onload = function () {
         img = new Image();
         // 画像が読み込まれたときの処理（canvasに描画）
-        img.onload = function() {
+        img.onload = function () {
           let canvas = document.getElementById("preview-before");
           if (canvas.getContext) {
             // canvas 2d contextが使える前提
@@ -100,7 +98,7 @@ export default {
         img.src = reader.result;
       }.bind(this);
     },
-    toPixel: function() {
+    toPixel: function () {
       let canvas = document.getElementById("preview-after");
       if (canvas.getContext && this.img != null) {
         let context = canvas.getContext("2d");
